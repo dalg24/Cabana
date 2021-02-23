@@ -28,7 +28,7 @@ foreach(_test Version Index CartesianGrid SoA)
   set(_target Cabana_${_test}_test)
   add_executable(${_target} tst${_test}.cpp unit_test_main.cpp)
   target_link_libraries(${_target} cabanacore cabana_core_gtest)
-  add_test(NAME ${_target} COMMAND ${NONMPI_PRECOMMAND} ${_target} ${gtest_args})
+  add_test(NAME ${_target} COMMAND ${NONMPI_PRECOMMAND} $<TARGET_FILE:${_target}> ${gtest_args})
 endforeach()
 
 ##--------------------------------------------------------------------------##
@@ -85,16 +85,16 @@ macro(Cabana_add_tests)
           # NOTE: When moving to CMake 3.10+ make sure to use MPIEXEC_EXECUTABLE instead
           add_test(NAME ${_target}_np_${_np} COMMAND
             ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} ${_np} ${MPIEXEC_PREFLAGS}
-            ${_target} ${MPIEXEC_POSTFLAGS} ${gtest_args})
+            $<TARGET_FILE:${_target}> ${MPIEXEC_POSTFLAGS} ${gtest_args})
         endforeach()
       else()
         if(_device STREQUAL PTHREAD OR _device STREQUAL OPENMP)
           foreach(_thread ${CABANA_UNIT_TEST_NUMTHREADS})
             add_test(NAME ${_target}_nt_${_thread} COMMAND
-              ${NONMPI_PRECOMMAND} ${_target} ${gtest_args} --kokkos-threads=${_thread})
+              ${NONMPI_PRECOMMAND} $<TARGET_FILE:${_target}> ${gtest_args} --kokkos-threads=${_thread})
           endforeach()
         else()
-          add_test(NAME ${NONMPI_PRECOMMAND} ${_target} COMMAND ${NONMPI_PRECOMMAND} ${_target} ${gtest_args})
+          add_test(NAME ${NONMPI_PRECOMMAND} $<TARGET_FILE:${_target}> COMMAND ${NONMPI_PRECOMMAND} ${_target} ${gtest_args})
         endif()
       endif()
     endforeach()
