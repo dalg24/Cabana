@@ -146,9 +146,9 @@ struct NeighborDiscriminatorCallback2D_FirstPass
                                      int primitive_index ) const
     {
         int const predicate_index = getData( predicate );
-        ++counts( predicate_index ); // WARNING see below**
+        Kokkos::atomic_increment( &counts( predicate_index ) );
         if ( std::is_same<Tag, FullNeighborTag>::value )
-            ++counts( primitive_index );
+            Kokkos::atomic_increment( &counts( primitive_index ) );
     }
 };
 
@@ -164,21 +164,21 @@ struct NeighborDiscriminatorCallback2D_FirstPass_BufferOptimization
                                      int primitive_index ) const
     {
         int const predicate_index = getData( predicate );
-        if ( counts( predicate_index ) < neighbors.extent_int( 1 ) &&
+        auto const count_predicate_index =
+            Kokkos::atomic_fetch_add( &counts( predicate_index ), 1 );
+        auto const count_primitive_index =
+            std::is_same<Tag, FullNeighborTag>::value
+                ? Kokkos::atomic_fetch_add( &counts( primitive_index ), 1 )
+                : 0;
+        if ( count_predicate_index < neighbors.extent_int( 1 ) &&
              ( !std::is_same<Tag, FullNeighborTag>::value ||
-               counts( primitive_index ) < neighbors.extent_int( 1 ) ) )
+               count_primitive_index < neighbors.extent_int( 1 ) ) )
         {
-            neighbors( predicate_index, counts( predicate_index )++ ) =
-                primitive_index; // WARNING see below*
+            neighbors( predicate_index, count_predicate_index ) =
+                primitive_index;
             if ( std::is_same<Tag, FullNeighborTag>::value )
-                neighbors( primitive_index, counts( primitive_index )++ ) =
+                neighbors( primitive_index, count_primitive_index ) =
                     predicate_index;
-        }
-        else
-        {
-            ++counts( predicate_index );
-            if ( std::is_same<Tag, FullNeighborTag>::value )
-                ++counts( primitive_index );
         }
     }
 };
@@ -198,10 +198,12 @@ struct NeighborDiscriminatorCallback2D_SecondPass
         assert( counts( predicate_index ) < neighbors.extent_int( 1 ) );
         assert( ( !std::is_same<Tag, FullNeighborTag>::value ||
                   counts( primitive_index ) < neighbors.extent_int( 1 ) ) );
-        neighbors( predicate_index, counts( predicate_index )++ ) =
-            primitive_index; // WARNING see below**
+        neighbors( predicate_index,
+                   Kokkos::atomic_fetch_add( &counts( predicate_index ), 1 ) ) =
+            primitive_index;
         if ( std::is_same<Tag, FullNeighborTag>::value )
-            neighbors( primitive_index, counts( primitive_index )++ ) =
+            neighbors( primitive_index, Kokkos::atomic_fetch_add(
+                                            &counts( primitive_index ), 1 ) ) =
                 predicate_index;
     }
 };
